@@ -508,45 +508,53 @@ document.querySelectorAll('.sheet').forEach(s => s.addEventListener('click', e =
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
+function pushMsg(html, withBtn) {
+  $('pushBox').innerHTML = (withBtn ? '<button class="btn ghost" id="pushBtn">🔔 Увімкнути сповіщення</button>' : '') +
+    (html ? '<div class="card note" style="text-align:left;margin-top:10px">' + html + '</div>' : '');
+  if (withBtn) $('pushBtn').onclick = () => setupPush(true);
+}
+function withTimeout(p, ms, what) {
+  return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what + ': немає відповіді')), ms))]);
+}
+const HOW_ALLOW = 'Натисніть значок 🔒 зліва від адреси → <b>Дозволи</b> (або «Налаштування сайту») → <b>Сповіщення</b> → <b>Дозволити</b>, потім оновіть сторінку.';
+
 async function setupPush(ask) {
-  const box = $('pushBox');
-  if (!('serviceWorker' in navigator)) { box.innerHTML = ''; return; }
+  if (!('serviceWorker' in navigator)) { pushMsg('Цей браузер не підтримує сповіщення. Відкрийте SNEWS у Chrome.', false); return; }
   if (isIOS && !standalone) {
-    box.innerHTML = '<div class="card note" style="text-align:left">🔔 Щоб отримувати сповіщення на iPhone: відкрийте цю сторінку в <b>Safari</b> → кнопка <b>Поділитися</b> → <b>«На початковий екран»</b>, і запускайте SNEWS зі значка.</div>';
+    pushMsg('🔔 Щоб отримувати сповіщення на iPhone: відкрийте цю сторінку в <b>Safari</b> → кнопка <b>Поділитися</b> → <b>«На початковий екран»</b>, і запускайте SNEWS зі значка.', false);
     return;
   }
-  if (!('Notification' in window) || !('PushManager' in window)) { box.innerHTML = ''; return; }
-  if (Notification.permission === 'denied') {
-    box.innerHTML = '<div class="card note" style="text-align:left">🔕 Сповіщення заборонені. Увімкніть їх у налаштуваннях браузера для цього сайту.</div>';
-    return;
-  }
-  if (Notification.permission !== 'granted' && !ask) {
-    box.innerHTML = '<button class="btn ghost" id="pushBtn">🔔 Увімкнути сповіщення</button>';
-    $('pushBtn').onclick = () => setupPush(true);
-    return;
-  }
+  if (!('Notification' in window) || !('PushManager' in window)) { pushMsg('Цей браузер не підтримує сповіщення. Відкрийте SNEWS у Chrome.', false); return; }
+  if (Notification.permission === 'denied') { pushMsg('🔕 Сповіщення заборонені для цього сайту. ' + HOW_ALLOW, false); return; }
+  if (Notification.permission !== 'granted' && !ask) { pushMsg('', true); return; }
   try {
     if (Notification.permission !== 'granted') {
+      pushMsg('Зачекайте… Браузер має запитати дозвіл на сповіщення.', false);
       const p = await Notification.requestPermission();
-      if (p !== 'granted') { setupPush(false); return; }
+      if (p !== 'granted') {
+        pushMsg('Дозвіл не отримано. Можливо, Chrome сховав запит (значок 🔔 у рядку адреси). ' + HOW_ALLOW, true);
+        return;
+      }
     }
+    if (ask) pushMsg('Підключаю сповіщення…', false);
+    if (typeof firebase === 'undefined') throw new Error('не завантажився Firebase — перевірте інтернет');
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    const fcm = await firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg || await navigator.serviceWorker.ready });
-    if (fcm && fcm !== store.get(LS.fcm)) {
-      const j = await api('push', { fcm });
-      if (j.ok) store.set(LS.fcm, fcm);
-    }
-    box.innerHTML = '';
-    // Повідомлення, коли застосунок відкритий
-    firebase.messaging().onMessage(p => {
-      const n = p.notification || {};
+    const reg = swReg || await withTimeout(navigator.serviceWorker.register('firebase-messaging-sw.js'), 15000, 'service worker');
+    const fcm = await withTimeout(firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg }), 20000, 'Firebase');
+    if (!fcm) throw new Error('Firebase не видав токен');
+    const j = await api('push', { fcm });
+    if (!j.ok) throw new Error(j.msg || 'сервер не зберіг пристрій');
+    store.set(LS.fcm, fcm);
+    if (ask) pushMsg('✅ Сповіщення увімкнено', false); else $('pushBox').innerHTML = '';
+    setTimeout(() => { if ($('pushBox').textContent.includes('увімкнено')) $('pushBox').innerHTML = ''; }, 4000);
+    firebase.messaging().onMessage(m => {
+      const n = m.notification || {};
       toast((n.title ? n.title + ': ' : '') + (n.body || ''));
       refresh();
     });
   } catch (e) {
     console.warn(e);
-    box.innerHTML = '<button class="btn ghost" id="pushBtn">🔔 Увімкнути сповіщення</button><div class="note">Не вдалося увімкнути. Спробуйте ще раз.</div>';
-    $('pushBtn').onclick = () => setupPush(true);
+    pushMsg('Не вдалося увімкнути: ' + esc(e.message || e) + '. Спробуйте ще раз.', true);
   }
 }
 
