@@ -84,6 +84,9 @@
   .row { display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px dashed var(--line); font-size:15px; }
   .row:last-child { border-bottom:0; }
   .row.minus span:last-child { color:var(--red); }
+  .row.b { font-weight:700; }
+  .row.sub { font-weight:700; border-top:1px solid var(--line); }
+  .row.i { font-size:14px; color:var(--muted); padding:4px 0 4px 14px; border-bottom:0; }
   .row.total { font-size:18px; font-weight:800; border-top:2px solid var(--g); border-bottom:0; margin-top:6px; padding-top:10px; }
   .grp { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-top:10px; }
 
@@ -383,12 +386,12 @@ function renderMarks(days) {
 // ---------- ЗП ----------
 const PAY_ROWS = [
   ['Відпрацьовано', null],
-  ['hours', 'Години', 'год'], ['weekendHours', 'З них у вихідні', 'год'], ['days', 'Днів', 'дн'],
+  ['hours', 'Години', 'год'], ['weekendHours', 'З них у вихідні', 'год'], ['days', 'Робочих днів', 'дн'], ['shifts', 'Змін', 'зм'],
   ['Нараховано', null],
-  ['base', 'Основне нарахування'], ['weekend', 'Доплата за вихідні'], ['difficulty', 'Доплата за важкість'], ['bonus', 'Премія'],
+  ['base', 'Основне нарахування'], ['weekend', 'Доплата за вихідні'], ['difficulty', 'Доплата за важкість'], ['bonus', 'Премія'], ['aid', 'Матеріальна допомога'], ['other', 'Інші доплати'],
   ['accrued', 'Разом нараховано', '', 'sub'],
-  ['Утримано', null],
-  ['goods', 'Товар', '', 'minus'], ['advance', 'Аванс', '', 'minus'], ['prevAdvance', 'Попередній аванс', '', 'minus'], ['deducted', 'Разом утримано', '', 'minus'],
+  ['Розрахунок за місяць', null],
+  ['earlier', 'Нараховано раніше за місяць'], ['advance', 'Аванс', '', 'minus'], ['goods', 'Товар', '', 'minus'], ['paid', 'Вже виплачено', '', 'minus'],
 ];
 function renderPay(items) {
   const list = $('payList');
@@ -396,6 +399,18 @@ function renderPay(items) {
   if (!items.length) { list.innerHTML = '<div class="empty">Тут з’являтимуться ваші розрахунки<br>після того, як їх опублікує керівник.</div>'; return; }
   list.innerHTML = items.map(p => {
     const d = p.data || {};
+    if (Array.isArray(d.lines)) {
+      // місячний розрахунковий лист — ті самі рядки, що й на папері з 1С
+      const body = d.lines.map(l => {
+        const v = String(l.v || '');
+        const neg = v.startsWith('-');
+        const val = v ? (neg ? '−' + v.slice(1) : v) + ' ₴' : '';
+        const cls = [l.s || '', neg ? 'minus' : ''].join(' ').trim();
+        const t = l.s === 'total' ? 'Залишок' : l.t;
+        return `<div class="row ${cls}"><span>${esc(t)}</span><span>${esc(val)}</span></div>`;
+      }).join('');
+      return `<div class="card pay"><h3>${esc(p.period)}</h3>${body}</div>`;
+    }
     let html = '', grp = null;
     PAY_ROWS.forEach(r => {
       if (r[1] === null) { grp = r[0]; return; }
