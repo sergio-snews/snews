@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="terminal.webmanifest">
+<meta name="theme-color" content="#0f1720">
+<meta name="mobile-web-app-capable" content="yes">
 <title>SERGIO · Відмітка часу</title>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <style>
@@ -39,10 +42,16 @@
   .box .small { font-size:13px; color:var(--muted); margin-top:12px; }
   .gear { position:fixed; right:14px; bottom:12px; width:46px; height:46px; border-radius:50%; border:1px solid #2b3a4a; background:#17212c; color:var(--muted); font-size:24px; line-height:44px; text-align:center; opacity:.55; cursor:pointer; z-index:5; }
   .gear:active { opacity:1; }
+  /* режим сну: чорний екран, маленький годинник, що повільно переміщується; камера працює */
+  .sleep { position:fixed; inset:0; background:#000; z-index:20; display:none; }
+  .sleep.show { display:block; }
+  .sleep .sc { position:absolute; color:#3a4552; font-size:42px; font-weight:600; font-variant-numeric:tabular-nums; transition:top 2s, left 2s; }
+  .sleep .sh { position:absolute; left:0; right:0; bottom:28px; text-align:center; color:#2a333d; font-size:18px; }
   @media (orientation:portrait) { .wrap { flex-direction:column; } .right { flex:none; } .clock { font-size:22vw; } }
 </style>
 </head>
 <body>
+<div class="sleep" id="sleep"><div class="sc" id="sleepClock">--:--</div><div class="sh">Торкніться екрана або піднесіть QR-код</div></div>
 
 <div class="wrap">
   <div class="left">
@@ -147,9 +156,38 @@
 
   // ---------- екран результату ----------
   let ovTimer;
+  // ---------- режим сну ----------
+  const SLEEP_MS = 60000;            // через скільки без руху гасити екран
+  let sleepTimer = null;
+  function wake() {
+    $('sleep').classList.remove('show');
+    clearTimeout(sleepTimer);
+    sleepTimer = setTimeout(() => {
+      if (!$('settings').classList.contains('show')) $('sleep').classList.add('show');
+    }, SLEEP_MS);
+  }
+  ['touchstart', 'mousedown', 'keydown'].forEach(ev => document.addEventListener(ev, wake, { passive: true }));
+  // Якщо термінал відкрито у вкладці Chrome — при дотику на весь екран (без вкладок і адресного рядка)
+  function goFull() {
+    const el = document.documentElement;
+    if (!document.fullscreenElement && el.requestFullscreen && !$('settings').classList.contains('show')) {
+      el.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+    }
+  }
+  document.addEventListener('click', goFull);
+  setInterval(() => {
+    if (!$('sleep').classList.contains('show')) return;
+    const c = $('sleepClock');
+    c.textContent = new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+    c.style.left = (10 + Math.random() * 70) + '%';      // годинник переміщується, щоб не випалював екран
+    c.style.top = (10 + Math.random() * 70) + '%';
+  }, 15000);
+  wake();
+
   function show(color, big, name, sub, ms) {
     const ov = $('overlay');
     ov.style.background = color; $('ovBig').textContent = big; $('ovName').textContent = name || ''; $('ovSub').textContent = sub || '';
+    wake();   // відмітка — екран прокидається, щоб людина побачила результат
     ov.classList.add('show'); clearTimeout(ovTimer);
     ovTimer = setTimeout(() => ov.classList.remove('show'), ms || 3500);
   }
