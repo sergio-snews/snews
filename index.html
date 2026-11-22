@@ -2,605 +2,259 @@
 <html lang="uk">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#A2CC3B">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="SNEWS">
-<title>SNEWS · SERGIO</title>
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<title>SERGIO · Відмітка часу</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <style>
-  :root { --g:#A2CC3B; --gd:#5f7f14; --gl:#f2f8e4; --ink:#1d2410; --muted:#6f7766; --line:#e6eadf;
-          --bg:#fafbf7; --red:#d84a3a; --amber:#c98a00; --safe-b: env(safe-area-inset-bottom); }
-  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
-  html,body { height:100%; background:var(--bg); color:var(--ink);
-              font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size:16px; }
-  button { font:inherit; cursor:pointer; }
-  input, textarea { font:inherit; }
-  .hidden { display:none !important; }
-
-  /* ---------- вхід ---------- */
-  #login { min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; }
-  #login img { width:min(260px,70vw); }
-  #login .app { margin-top:6px; font-size:15px; letter-spacing:.35em; color:var(--muted); font-weight:600; }
-  .form { width:min(360px,100%); margin-top:36px; }
-  .form label { display:block; font-size:14px; color:var(--muted); margin:14px 0 6px; }
-  .form input { width:100%; padding:14px 16px; font-size:20px; border:1.5px solid var(--line); border-radius:14px; background:#fff; outline:none; }
-  .form input:focus { border-color:var(--g); }
-  .btn { width:100%; margin-top:24px; padding:16px; border:0; border-radius:14px; background:var(--g); color:var(--ink); font-size:18px; font-weight:700; }
-  .btn:disabled { opacity:.5; }
-  .btn.ghost { background:#fff; border:1.5px solid var(--line); color:var(--ink); font-weight:600; }
-  .err { color:var(--red); font-size:15px; margin-top:14px; min-height:20px; text-align:center; }
-  .note { color:var(--muted); font-size:13px; margin-top:16px; text-align:center; line-height:1.4; }
-
-  /* ---------- основний екран ---------- */
-  #main { min-height:100%; padding-bottom:calc(76px + var(--safe-b)); }
-  header { position:sticky; top:0; z-index:5; background:var(--bg); display:flex; align-items:center; gap:10px;
-           padding:calc(12px + env(safe-area-inset-top)) 18px 10px; border-bottom:1px solid var(--line); }
-  header .who { flex:1; min-width:0; }
-  header .who b { display:block; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  header .who span { font-size:13px; color:var(--muted); }
-  .menu { border:0; background:none; font-size:22px; color:var(--muted); padding:4px 6px; }
-  section { padding:18px; }
-  h2 { font-size:20px; margin-bottom:12px; }
-  .card { background:#fff; border:1px solid var(--line); border-radius:18px; padding:16px; margin-bottom:12px; }
-  .muted { color:var(--muted); }
-  .empty { text-align:center; color:var(--muted); padding:40px 10px; line-height:1.5; }
-  .offline { background:#fff6db; color:#7a5a00; font-size:13px; text-align:center; padding:6px; }
-
-  /* QR */
-  .qrbox { display:flex; flex-direction:column; align-items:center; text-align:center; }
-  #qr { background:#fff; padding:18px; border-radius:22px; border:2px solid var(--g); }
-  #qr img, #qr canvas { display:block; width:min(68vw,300px) !important; height:auto !important; image-rendering:pixelated; }
-  .qrname { font-size:20px; font-weight:700; margin-top:16px; }
-  .qrcode { font-family: ui-monospace, Menlo, monospace; color:var(--muted); margin-top:4px; letter-spacing:.05em; }
-  .qrhint { margin-top:14px; color:var(--muted); font-size:15px; }
-  .today { margin-top:18px; font-size:15px; padding:10px 14px; border-radius:12px; background:var(--gl); color:var(--gd); }
-  .pushbox { margin-top:18px; width:100%; }
-
-  /* Відмітки */
-  .sum { display:flex; gap:10px; margin-bottom:14px; }
-  .sum .card { flex:1; margin:0; text-align:center; padding:12px; }
-  .sum b { display:block; font-size:22px; }
-  .sum span { font-size:12px; color:var(--muted); }
-  .day { display:flex; align-items:center; gap:12px; padding:12px 14px; }
-  .day .d { width:54px; flex:none; }
-  .day .d b { display:block; font-size:17px; }
-  .day .d span { font-size:13px; color:var(--muted); }
-  .day .d.we span { color:var(--red); }
-  .day .t { flex:1; font-size:15px; line-height:1.5; }
-  .day .h { font-weight:700; font-size:16px; white-space:nowrap; }
-  .day.problem { border-color:#f1c27d; background:#fffaf0; }
-  .warn { color:var(--amber); font-size:13px; }
-
-  /* ЗП */
-  .pay h3 { font-size:17px; margin-bottom:10px; }
-  .row { display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px dashed var(--line); font-size:15px; }
-  .row:last-child { border-bottom:0; }
-  .row.minus span:last-child { color:var(--red); }
-  .row.b { font-weight:700; }
-  .row.sub { font-weight:700; border-top:1px solid var(--line); }
-  .row.i { font-size:14px; color:var(--muted); padding:4px 0 4px 14px; border-bottom:0; }
-  .ackbox { margin-top:12px; font-size:13px; color:var(--muted); text-align:center; }
-  .ackbtn { margin-top:12px; width:100%; }
-  .row.total { font-size:18px; font-weight:800; border-top:2px solid var(--g); border-bottom:0; margin-top:6px; padding-top:10px; }
-  .grp { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-top:10px; }
-
-  /* Повідомлення */
-  .seg { display:flex; background:#eef1e8; border-radius:12px; padding:4px; margin-bottom:14px; }
-  .seg button { flex:1; border:0; background:none; padding:10px; border-radius:9px; font-weight:600; color:var(--muted); position:relative; }
-  .seg button.on { background:#fff; color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.08); }
-  .msg { cursor:pointer; }
-  .msg .top { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-bottom:6px; }
-  .msg .kind { font-weight:700; }
-  .msg .kind.thanks { color:var(--gd); }
-  .msg .kind.remark { color:var(--red); }
-  .msg .txt { font-size:15px; line-height:1.45; white-space:pre-wrap; }
-  .msg.unread { border-left:5px solid var(--g); }
-  .msg.unread .txt { font-weight:600; }
-  .ap .status { font-size:13px; font-weight:700; }
-  .ap .reply { margin-top:10px; padding:10px 12px; background:var(--gl); border-radius:12px; font-size:15px; white-space:pre-wrap; }
-  .chips { display:flex; flex-wrap:wrap; gap:8px; }
-  .chip { border:1.5px solid var(--line); background:#fff; border-radius:999px; padding:9px 14px; font-size:15px; }
-  .chip.on { border-color:var(--g); background:var(--gl); font-weight:700; }
-  textarea { width:100%; min-height:110px; margin-top:12px; padding:12px 14px; border:1.5px solid var(--line); border-radius:14px; outline:none; resize:vertical; }
-  textarea:focus { border-color:var(--g); }
-  .photo { display:flex; align-items:center; gap:10px; margin-top:12px; }
-  .photo img { width:64px; height:64px; object-fit:cover; border-radius:10px; }
-
-  /* нижнє меню */
-  nav { position:fixed; left:0; right:0; bottom:0; z-index:6; display:flex; background:#fff; border-top:1px solid var(--line);
-        padding-bottom:var(--safe-b); }
-  nav button { flex:1; border:0; background:none; padding:9px 4px 10px; color:var(--muted); font-size:12px; font-weight:600; position:relative; }
-  nav button i { display:block; font-style:normal; font-size:22px; line-height:1.2; filter:grayscale(1); opacity:.7; }
-  nav button.on { color:var(--gd); }
-  nav button.on i { filter:none; opacity:1; }
-  .badge { position:absolute; top:4px; left:calc(50% + 8px); min-width:18px; height:18px; padding:0 5px; border-radius:9px;
-           background:var(--red); color:#fff; font-size:11px; line-height:18px; }
-
-  .sheet { position:fixed; inset:0; z-index:10; background:rgba(0,0,0,.35); display:flex; align-items:flex-end; }
-  .sheet .in { background:#fff; width:100%; border-radius:22px 22px 0 0; padding:22px 18px calc(22px + var(--safe-b)); max-height:92%; overflow:auto; }
-  .toast { position:fixed; left:50%; bottom:calc(92px + var(--safe-b)); transform:translateX(-50%); background:var(--ink); color:#fff;
-           padding:10px 18px; border-radius:12px; font-size:15px; z-index:20; max-width:90vw; text-align:center; }
+  :root { --bg:#0f1720; --card:#17212c; --text:#eef3f7; --muted:#8aa0b2; --ok:#22c55e; --out:#3b82f6; --err:#ef4444; --warn:#f59e0b; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow:hidden; }
+  .wrap { display:flex; height:100%; gap:24px; padding:24px; }
+  .left { flex:1; display:flex; flex-direction:column; justify-content:space-between; }
+  .right { flex:1.1; display:flex; align-items:center; justify-content:center; }
+  .brand { font-size:20px; letter-spacing:.2em; color:var(--muted); }
+  .point { font-size:22px; margin-top:6px; }
+  .clock { font-size:min(16vw,140px); font-weight:700; line-height:1; font-variant-numeric:tabular-nums; }
+  .date { font-size:24px; color:var(--muted); margin-top:8px; }
+  .hint { font-size:26px; line-height:1.35; }
+  .hint b { color:var(--ok); }
+  .status { font-size:15px; color:var(--muted); }
+  .status .q { color:var(--warn); font-weight:600; }
+  .cam { position:relative; width:100%; max-width:620px; aspect-ratio:4/3; border-radius:24px; overflow:hidden; background:#000; border:3px solid #24313f; }
+  video { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+  .frame { position:absolute; inset:18%; border:4px dashed rgba(255,255,255,.55); border-radius:18px; }
+  .overlay { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px; }
+  .overlay.show { display:flex; }
+  .overlay .big { font-size:min(12vw,110px); font-weight:800; }
+  .overlay .name { font-size:min(6vw,52px); margin-top:18px; font-weight:600; }
+  .overlay .sub { font-size:28px; margin-top:14px; opacity:.9; }
+  .settings { position:fixed; inset:0; background:var(--bg); display:none; align-items:center; justify-content:center; }
+  .settings.show { display:flex; }
+  .box { background:var(--card); padding:32px; border-radius:20px; width:min(560px,92vw); }
+  .box h2 { margin-bottom:18px; }
+  .box label { display:block; margin:14px 0 6px; color:var(--muted); }
+  .box input { width:100%; padding:14px; font-size:18px; border-radius:10px; border:1px solid #2b3a4a; background:#0e151d; color:var(--text); }
+  .box button { margin-top:22px; width:100%; padding:16px; font-size:20px; border:0; border-radius:12px; background:var(--ok); color:#06240f; font-weight:700; }
+  .box .small { font-size:13px; color:var(--muted); margin-top:12px; }
+  .gear { position:fixed; right:14px; bottom:12px; width:46px; height:46px; border-radius:50%; border:1px solid #2b3a4a; background:#17212c; color:var(--muted); font-size:24px; line-height:44px; text-align:center; opacity:.55; cursor:pointer; z-index:5; }
+  .gear:active { opacity:1; }
+  @media (orientation:portrait) { .wrap { flex-direction:column; } .right { flex:none; } .clock { font-size:22vw; } }
 </style>
 </head>
 <body>
 
-<!-- ===================== ВХІД ===================== -->
-<div id="login" class="hidden">
-  <img src="logo.png" alt="SERGIO">
-  <div class="app">SNEWS</div>
-  <div class="form">
-    <label for="lPhone">Номер телефону</label>
-    <input id="lPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0XX XXX XX XX">
-    <label for="lPin">PIN</label>
-    <input id="lPin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8" placeholder="••••">
-    <button class="btn" id="lBtn">Увійти</button>
-    <div class="err" id="lErr"></div>
-    <div class="note">PIN видає відділ кадрів.<br>Якщо забули PIN — зверніться до відділу кадрів.</div>
+<div class="wrap">
+  <div class="left">
+    <div>
+      <div class="brand">SERGIO</div>
+      <div class="point" id="point">—</div>
+    </div>
+    <div>
+      <div class="clock" id="clock">--:--</div>
+      <div class="date" id="date"></div>
+    </div>
+    <div class="hint">Піднесіть <b>QR-код</b> на телефоні до камери</div>
+    <div class="status" id="status">Запуск камери…</div>
+  </div>
+  <div class="right">
+    <div class="cam"><video id="video" playsinline muted></video><div class="frame"></div></div>
   </div>
 </div>
 
-<!-- ===================== ОСНОВНИЙ ЕКРАН ===================== -->
-<div id="main" class="hidden">
-  <header>
-    <div class="who"><b id="hName"></b><span id="hDept"></span></div>
-    <button class="menu" id="menuBtn" aria-label="Меню">⋯</button>
-  </header>
-  <div class="offline hidden" id="offline">Немає інтернету — показано збережені дані</div>
+<button class="gear" id="gear" title="Налаштування">⚙</button>
 
-  <!-- QR -->
-  <section id="tab-qr">
-    <div class="qrbox">
-      <div id="qr"></div>
-      <div class="qrname" id="qName"></div>
-      <div class="qrcode" id="qCode"></div>
-      <div class="qrhint">Покажіть код камері термінала при приході та при виході</div>
-      <div class="today hidden" id="qToday"></div>
-      <div class="pushbox" id="pushBox"></div>
-    </div>
-  </section>
-
-  <!-- Відмітки -->
-  <section id="tab-marks" class="hidden">
-    <h2>Мої відмітки</h2>
-    <div class="sum">
-      <div class="card"><b id="sHalf">—</b><span id="sHalfLbl">годин за пів місяця</span></div>
-      <div class="card"><b id="sDays">—</b><span>днів</span></div>
-    </div>
-    <div id="marksList"></div>
-  </section>
-
-  <!-- ЗП -->
-  <section id="tab-pay" class="hidden">
-    <h2>Розрахунок ЗП</h2>
-    <div id="payList"></div>
-  </section>
-
-  <!-- Повідомлення -->
-  <section id="tab-msg" class="hidden">
-    <div class="seg">
-      <button id="segMsg" class="on">Від керівника <span class="badge hidden" id="segBadge" style="position:static;display:inline-block;margin-left:6px;vertical-align:1px"></span></button>
-      <button id="segAp">Мої звернення</button>
-    </div>
-    <div id="msgPane"><div id="msgList"></div></div>
-    <div id="apPane" class="hidden">
-      <button class="btn" id="newAp" style="margin:0 0 14px">✉ Написати у відділ кадрів</button>
-      <div id="apList"></div>
-    </div>
-  </section>
-
-  <nav>
-    <button data-tab="qr" class="on"><i>▦</i>QR</button>
-    <button data-tab="marks"><i>🕘</i>Відмітки</button>
-    <button data-tab="pay"><i>₴</i>ЗП</button>
-    <button data-tab="msg"><i>💬</i>Повідомлення<span class="badge hidden" id="navBadge"></span></button>
-  </nav>
+<div class="overlay" id="overlay">
+  <div class="big" id="ovBig"></div>
+  <div class="name" id="ovName"></div>
+  <div class="sub" id="ovSub"></div>
 </div>
 
-<!-- Звернення -->
-<div class="sheet hidden" id="apSheet">
-  <div class="in">
-    <h2>Звернення у відділ кадрів</h2>
-    <div class="chips" id="apTypes">
-      <button class="chip on">Захворів</button>
-      <button class="chip">Не прийду / відгул</button>
-      <button class="chip">Запізнююсь</button>
-      <button class="chip">Інше</button>
-    </div>
-    <textarea id="apText" maxlength="2000" placeholder="Коротко опишіть ситуацію"></textarea>
-    <div class="photo">
-      <button class="btn ghost" id="apPhotoBtn" style="margin:0;width:auto;padding:10px 14px">📎 Фото</button>
-      <img id="apPhotoPrev" class="hidden" alt="">
-      <span class="muted" id="apPhotoNote" style="font-size:13px">наприклад, довідка</span>
-      <input type="file" id="apPhoto" accept="image/*" class="hidden">
-    </div>
-    <button class="btn" id="apSend">Надіслати</button>
-    <button class="btn ghost" id="apCancel" style="margin-top:10px">Скасувати</button>
+<div class="settings" id="settings">
+  <div class="box">
+    <h2>Налаштування термінала</h2>
+    <label>Адреса Google Apps Script (закінчується на /exec)</label>
+    <input id="sApi" type="url" inputmode="url" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
+    <label>Ключ термінала (TERMINAL_KEY)</label>
+    <input id="sKey" inputmode="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label>Назва точки</label>
+    <input id="sPoint" autocomplete="off" placeholder="Приміщення 1">
+    <button id="sSave">Зберегти і запустити</button>
+    <div class="small">Повернутися сюди пізніше — кнопка ⚙ у правому нижньому куті (потрібен ключ термінала).</div>
   </div>
 </div>
 
-<!-- Меню -->
-<div class="sheet hidden" id="menuSheet">
-  <div class="in">
-    <h2 id="mName"></h2>
-    <div class="muted" id="mInfo" style="line-height:1.6"></div>
-    <button class="btn ghost" id="mRefresh">Оновити дані</button>
-    <button class="btn ghost" id="mLogout" style="color:var(--red)">Вийти з акаунта</button>
-    <button class="btn" id="mClose" style="margin-top:10px">Закрити</button>
-  </div>
-</div>
+<canvas id="scan" hidden></canvas>
+<canvas id="shot" hidden></canvas>
 
 <script>
-// ===================== НАЛАШТУВАННЯ =====================
-const API = 'https://script.google.com/macros/s/AKfycbwbpTINc-lu5i0fyrzCdQOzXTVEHJREX_Q85Z9zZwPD_LRuytBaHASat60m7Ix8Vnw/exec';
-const firebaseConfig = {
-  apiKey: "AIzaSyCx2ZTsYQLQwuSVAqk_RLweBRIWrMRqKfw",
-  authDomain: "snews-79501.firebaseapp.com",
-  projectId: "snews-79501",
-  storageBucket: "snews-79501.firebasestorage.app",
-  messagingSenderId: "96145079969",
-  appId: "1:96145079969:web:210e3054e800165152bae0"
-};
-const VAPID_KEY = "BFRUsT6uT_kVoQhqg1yS8avXg9MlTSs3FDXyEm4EyT-cZ3FvAJYw3CprpzzFAtoJXK09Pth4dzYkX4siTaOzc1s";
-// =========================================================
+(function () {
+  const $ = id => document.getElementById(id);
+  const LS = { cfg: 'sergio_terminal_cfg', queue: 'sergio_terminal_queue' };
+  const COOLDOWN_MS = 8000;      // той самий код не обробляємо повторно 8 сек
+  const RETRY_MS = 30000;        // повтор відправки черги
 
-const $ = id => document.getElementById(id);
-const LS = { tok:'snews_token', me:'snews_me', marks:'snews_marks', msg:'snews_msg', ap:'snews_ap', pay:'snews_pay', fcm:'snews_fcm' };
-const store = { get:k => { try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; } },
-                set:(k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} } };
-let token = store.get(LS.tok);
-let me = store.get(LS.me);
-let swReg = null;
-
-function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function toast(t) { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); }
-function num(x) { return Number(x || 0).toLocaleString('uk-UA', { maximumFractionDigits: 2 }); }
-
-async function api(action, data = {}) {
-  const r = await fetch(API, { method:'POST', body: JSON.stringify(Object.assign({ action, token }, data)) }); // text/plain — без CORS-preflight
-  const j = await r.json();
-  if (j.auth === false) { logout(true); throw new Error('auth'); }
-  return j;
-}
-
-// ===================== ВХІД =====================
-$('lBtn').onclick = async () => {
-  const phone = $('lPhone').value, pin = $('lPin').value.trim();
-  $('lErr').textContent = '';
-  if (phone.replace(/\D/g,'').length < 9 || pin.length < 4) { $('lErr').textContent = 'Введіть номер телефону і PIN'; return; }
-  $('lBtn').disabled = true;
-  try {
-    const j = await api('login', { phone, pin });
-    if (!j.ok) { $('lErr').textContent = j.msg || 'Не вдалося увійти'; return; }
-    token = j.token; store.set(LS.tok, token);
-    me = { code: j.code, name: j.name }; store.set(LS.me, me);
-    $('lPin').value = '';
-    showMain();
-  } catch (e) {
-    $('lErr').textContent = 'Немає зв’язку. Перевірте інтернет.';
-  } finally { $('lBtn').disabled = false; }
-};
-$('lPin').addEventListener('keydown', e => { if (e.key === 'Enter') $('lBtn').click(); });
-
-function logout(silent) {
-  if (!silent && token) api('logout').catch(() => {});
-  Object.values(LS).forEach(k => localStorage.removeItem(k));
-  token = null; me = null;
-  $('main').classList.add('hidden'); $('login').classList.remove('hidden');
-  $('menuSheet').classList.add('hidden');
-  if (silent) $('lErr').textContent = 'Увійдіть знову (PIN змінено або сесія закінчилась)';
-}
-
-// ===================== ОСНОВНИЙ ЕКРАН =====================
-function showMain() {
-  $('login').classList.add('hidden'); $('main').classList.remove('hidden');
-  renderHeader(); renderQR();
-  renderMarks(store.get(LS.marks)); renderMsgs(store.get(LS.msg)); renderAppeals(store.get(LS.ap)); renderPay(store.get(LS.pay));
-  openTab((location.hash || '#qr').slice(1));
-  refresh();
-  setupPush(false);
-}
-
-function renderHeader() {
-  $('hName').textContent = me.name || '';
-  $('hDept').textContent = [me.position, me.dept].filter(Boolean).join(' · ');
-  $('mName').textContent = me.name || '';
-  $('mInfo').innerHTML = [me.position && 'Посада: ' + esc(me.position), me.dept && 'Відділ: ' + esc(me.dept),
-                          me.hired && 'Працює з ' + esc(me.hired), 'Код: ' + esc(me.code)].filter(Boolean).join('<br>');
-}
-
-function renderQR() {
-  $('qr').innerHTML = '';
-  new QRCode($('qr'), { text: me.code, width: 600, height: 600, correctLevel: QRCode.CorrectLevel.M });
-  $('qName').textContent = me.name;
-  $('qCode').textContent = me.code;
-}
-
-async function refresh() {
-  try {
-    const [m, marks, msgs, aps, pay] = await Promise.all([
-      api('me'), api('mymarks', { days: 31 }), api('messages'), api('appeals'), api('payslips')
-    ]);
-    $('offline').classList.add('hidden');
-    if (m.ok) { me = Object.assign(me, m); store.set(LS.me, me); renderHeader(); if (me.code !== $('qCode').textContent) renderQR(); }
-    if (marks.ok) { store.set(LS.marks, marks.days); renderMarks(marks.days); }
-    if (msgs.ok)  { store.set(LS.msg, msgs.items); renderMsgs(msgs.items); }
-    if (aps.ok)   { store.set(LS.ap, aps.items); renderAppeals(aps.items); }
-    if (pay.ok)   { store.set(LS.pay, pay.items); renderPay(pay.items); }
-  } catch (e) {
-    if (e.message !== 'auth') $('offline').classList.remove('hidden');
+  // ---------- конфіг ----------
+  let cfg = JSON.parse(localStorage.getItem(LS.cfg) || '{}');
+  const url = new URLSearchParams(location.search);
+  if (url.get('api'))   cfg.api = url.get('api');
+  if (url.get('key'))   cfg.key = url.get('key').trim().toLowerCase();
+  if (url.get('point')) cfg.point = url.get('point');
+  if (url.get('api') || url.get('key') || url.get('point')) {
+    localStorage.setItem(LS.cfg, JSON.stringify(cfg));
+    history.replaceState(null, '', location.pathname);   // ключ не висить в адресі
   }
-}
 
-// ---------- вкладки ----------
-document.querySelectorAll('nav button').forEach(b => b.onclick = () => openTab(b.dataset.tab));
-function openTab(t) {
-  if (t === 'appeal') { t = 'msg'; seg('ap'); }
-  if (!['qr','marks','pay','msg'].includes(t)) t = 'qr';
-  ['qr','marks','pay','msg'].forEach(x => $('tab-' + x).classList.toggle('hidden', x !== t));
-  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-  history.replaceState(null, '', '#' + t);
-  window.scrollTo(0, 0);
-}
+  function openSettings() {
+    $('sApi').value = cfg.api || ''; $('sKey').value = cfg.key || ''; $('sPoint').value = cfg.point || '';
+    $('settings').classList.add('show');
+  }
+  $('sSave').onclick = () => {
+    cfg = { api: $('sApi').value.replace(/\s/g, ''), key: $('sKey').value.replace(/[^0-9a-zA-Z]/g, '').toLowerCase(), point: $('sPoint').value.trim() };
+    localStorage.setItem(LS.cfg, JSON.stringify(cfg));
+    $('settings').classList.remove('show');
+    start();
+  };
+  // Кнопка ⚙ — налаштування захищені ключем термінала, щоб працівники випадково не змінили
+  $('gear').onclick = () => {
+    if (!cfg.key) { openSettings(); return; }
+    const k = prompt('Введіть ключ термінала, щоб відкрити налаштування:');
+    if (k === null) return;
+    if (k.trim().toLowerCase() === String(cfg.key).toLowerCase()) openSettings();
+    else alert('Невірний ключ');
+  };
 
-// ---------- відмітки ----------
-function renderMarks(days) {
-  const list = $('marksList');
-  if (!days) { list.innerHTML = '<div class="empty">Завантаження…</div>'; return; }
-  if (!days.length) { list.innerHTML = '<div class="empty">Відміток за останній місяць немає</div>'; $('sHalf').textContent = '0'; $('sDays').textContent = '0'; return; }
+  // ---------- годинник ----------
+  const days = ['неділя','понеділок','вівторок','середа','четвер',"п'ятниця",'субота'];
+  function tick() {
+    const d = new Date();
+    $('clock').textContent = d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+    $('date').textContent = d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' }) + ', ' + days[d.getDay()];
+  }
+  tick(); setInterval(tick, 1000);
 
-  // Поточна половина місяця: 1–15 або 16–кінець
-  const now = new Date();
-  const ym = now.toISOString().slice(0, 7);
-  const first = now.getDate() <= 15;
-  const inHalf = days.filter(d => d.date.slice(0, 7) === ym && (Number(d.date.slice(8)) <= 15) === first);
-  $('sHalf').textContent = num(inHalf.reduce((s, d) => s + d.hours, 0));
-  $('sHalfLbl').textContent = 'годин за ' + (first ? '1–15' : '16–' + new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()) + ' число';
-  $('sDays').textContent = inHalf.filter(d => d.hours > 0 || d.open).length;
-
-  const today = days.find(d => d.open);
-  $('qToday').classList.toggle('hidden', !today);
-  if (today) $('qToday').textContent = '✔ Сьогодні на роботі з ' + today.marks.filter(m => m.type === 'Прихід').slice(-1)[0].time;
-
-  list.innerHTML = days.map(d => {
-    const pairs = []; let open = null;
-    d.marks.forEach(m => {
-      if (m.type === 'Прихід') { if (open) pairs.push(open + ' → ?'); open = m.time; }
-      else { pairs.push((open || '?') + ' → ' + m.time); open = null; }
-    });
-    if (open) pairs.push(open + (d.open ? ' → зараз' : ' → ?'));
-    const we = d.dow === 'Сб' || d.dow === 'Нд';
-    return `<div class="card day${d.problem ? ' problem' : ''}">
-      <div class="d${we ? ' we' : ''}"><b>${d.date.slice(8)}.${d.date.slice(5,7)}</b><span>${d.dow}</span></div>
-      <div class="t">${pairs.map(esc).join('<br>')}${d.problem ? '<div class="warn">⚠ немає пари відміток — години внесе відділ кадрів</div>' : ''}</div>
-      <div class="h">${d.open ? '…' : num(d.hours) + ' год'}</div></div>`;
-  }).join('');
-}
-
-// ---------- ЗП ----------
-const PAY_ROWS = [
-  ['Відпрацьовано', null],
-  ['hours', 'Години', 'год'], ['weekendHours', 'З них у вихідні', 'год'], ['days', 'Робочих днів', 'дн'], ['shifts', 'Змін', 'зм'],
-  ['Нараховано', null],
-  ['base', 'Основне нарахування'], ['weekend', 'Доплата за вихідні'], ['difficulty', 'Доплата за важкість'], ['bonus', 'Премія'], ['aid', 'Матеріальна допомога'], ['other', 'Інші доплати'],
-  ['accrued', 'Разом нараховано', '', 'sub'],
-  ['Розрахунок за місяць', null],
-  ['earlier', 'Нараховано раніше за місяць'], ['advance', 'Аванс', '', 'minus'], ['goods', 'Товар', '', 'minus'], ['paid', 'Вже виплачено', '', 'minus'],
-];
-function payFoot(p) {
-  if (p.ack) return `<div class="ackbox">✔ Ознайомлено ${esc(p.ack)}</div>`;
-  return `<button class="btn ackbtn" data-ack="${esc(p.period)}">Ознайомився</button>`;
-}
-function renderPay(items) {
-  const list = $('payList');
-  if (!items) { list.innerHTML = '<div class="empty">Завантаження…</div>'; return; }
-  const askHR = `<div class="ackbox" style="margin:16px 0">Щоб отримати розрахунковий лист, напишіть у відділ кадрів.<button class="btn ghost ackbtn" id="payAsk">Написати у відділ кадрів</button></div>`;
-  const bindAsk = () => { const b = $('payAsk'); if (b) b.onclick = () => {
-    document.querySelectorAll('#apTypes .chip').forEach(x => x.classList.toggle('on', x.textContent === 'Інше'));
-    $('apText').value = 'Прошу надіслати розрахунковий лист за ';
-    $('apSheet').classList.remove('hidden'); $('apText').focus();
-  }; };
-  if (!items.length) { list.innerHTML = '<div class="empty">Розрахунків зараз немає.</div>' + askHR; bindAsk(); return; }
-  list.innerHTML = items.map(p => {
-    const d = p.data || {};
-    if (Array.isArray(d.lines)) {
-      // місячний розрахунковий лист — ті самі рядки, що й на папері з 1С
-      const body = d.lines.map(l => {
-        const v = String(l.v || '');
-        const neg = v.startsWith('-');
-        const val = v ? (neg ? '−' + v.slice(1) : v) + ' ₴' : '';
-        const cls = [l.s || '', neg ? 'minus' : ''].join(' ').trim();
-        const t = l.s === 'total' ? 'Залишок' : l.t;
-        return `<div class="row ${cls}"><span>${esc(t)}</span><span>${esc(val)}</span></div>`;
-      }).join('');
-      return `<div class="card pay"><h3>${esc(p.period)}</h3>${body}${payFoot(p)}</div>`;
-    }
-    let html = '', grp = null;
-    PAY_ROWS.forEach(r => {
-      if (r[1] === null) { grp = r[0]; return; }
-      const v = d[r[0]];
-      if (v === undefined || v === null || v === '' || (Number(v) === 0 && r[0] !== 'hours')) return;
-      if (grp) { html += `<div class="grp">${grp}</div>`; grp = null; }
-      const val = r[2] ? num(v) + ' ' + r[2] : num(v) + ' ₴';
-      html += `<div class="row${r[3] === 'minus' ? ' minus' : ''}"><span>${esc(r[1])}</span><span>${r[3] === 'minus' ? '−' : ''}${val}</span></div>`;
-    });
-    if (d.total !== undefined) html += `<div class="row total"><span>До виплати</span><span>${num(d.total)} ₴</span></div>`;
-    if (d.note) html += `<div class="muted" style="margin-top:8px;font-size:14px">${esc(d.note)}</div>`;
-    return `<div class="card pay"><h3>${esc(p.period)}</h3>${html}${payFoot(p)}</div>`;
-  }).join('') + askHR;
-  bindAsk();
-  list.querySelectorAll('[data-ack]').forEach(b => b.onclick = async () => {
-    b.disabled = true;
+  // ---------- звук ----------
+  let audio;
+  function beep(ok) {
     try {
-      const j = await api('payack', { period: b.dataset.ack });
-      if (j.ok) { store.set(LS.pay, j.items); renderPay(j.items); toast('Дякуємо!'); }
-      else { b.disabled = false; toast(j.msg || 'Помилка'); }
-    } catch (e) { b.disabled = false; if (e.message !== 'auth') toast('Немає зв’язку'); }
-  });
-}
-
-// ---------- повідомлення ----------
-function renderMsgs(items) {
-  const list = $('msgList');
-  const unread = (items || []).filter(m => !m.read).length;
-  ['navBadge', 'segBadge'].forEach(id => { $(id).textContent = unread; $(id).classList.toggle('hidden', !unread); });
-  if (!items) { list.innerHTML = '<div class="empty">Завантаження…</div>'; return; }
-  if (!items.length) { list.innerHTML = '<div class="empty">Повідомлень поки немає</div>'; return; }
-  list.innerHTML = items.map(m => {
-    const cls = m.kind === 'Подяка' ? 'thanks' : (m.kind === 'Зауваження' ? 'remark' : '');
-    const icon = m.kind === 'Подяка' ? '💚 ' : (m.kind === 'Зауваження' ? '❗ ' : '');
-    return `<div class="card msg${m.read ? '' : ' unread'}" data-id="${esc(m.id)}">
-      <div class="top"><span class="kind ${cls}">${icon}${esc(m.kind || 'Повідомлення')}</span><span>${esc(m.date)}</span></div>
-      <div class="txt">${esc(m.text)}</div></div>`;
-  }).join('');
-  list.querySelectorAll('.msg.unread').forEach(el => el.onclick = async () => {
-    el.classList.remove('unread');
-    const all = store.get(LS.msg) || [];
-    const it = all.find(x => x.id === el.dataset.id); if (it) it.read = true;
-    store.set(LS.msg, all); renderMsgs(all);
-    api('read', { id: el.dataset.id }).catch(() => {});
-  });
-}
-
-function renderAppeals(items) {
-  const list = $('apList');
-  if (!items) { list.innerHTML = ''; return; }
-  if (!items.length) { list.innerHTML = '<div class="empty">Ви ще не надсилали звернень</div>'; return; }
-  list.innerHTML = items.map(a => {
-    const color = a.status === 'Нове' ? 'var(--amber)' : 'var(--gd)';
-    return `<div class="card ap">
-      <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:6px">
-        <span><b style="color:var(--ink)">${esc(a.type)}</b> · ${esc(a.time)}</span><span class="status" style="color:${color}">${esc(a.status === 'Нове' ? 'Надіслано' : a.status)}</span></div>
-      <div style="white-space:pre-wrap">${esc(a.text)}${a.hasPhoto ? ' 📎' : ''}</div>
-      ${a.reply ? `<div class="reply"><b>Відділ кадрів:</b> ${esc(a.reply)}</div>` : ''}</div>`;
-  }).join('');
-}
-
-function seg(which) {
-  $('segMsg').classList.toggle('on', which === 'msg'); $('segAp').classList.toggle('on', which === 'ap');
-  $('msgPane').classList.toggle('hidden', which !== 'msg'); $('apPane').classList.toggle('hidden', which !== 'ap');
-}
-$('segMsg').onclick = () => seg('msg');
-$('segAp').onclick = () => seg('ap');
-
-// ---------- нове звернення ----------
-let apPhoto = null;
-$('newAp').onclick = () => { $('apSheet').classList.remove('hidden'); };
-$('apCancel').onclick = () => { $('apSheet').classList.add('hidden'); };
-document.querySelectorAll('#apTypes .chip').forEach(c => c.onclick = () => {
-  document.querySelectorAll('#apTypes .chip').forEach(x => x.classList.remove('on')); c.classList.add('on');
-});
-$('apPhotoBtn').onclick = () => $('apPhoto').click();
-$('apPhoto').onchange = async () => {
-  const f = $('apPhoto').files[0]; if (!f) return;
-  apPhoto = await shrink(f, 1280, 0.75);
-  $('apPhotoPrev').src = apPhoto; $('apPhotoPrev').classList.remove('hidden'); $('apPhotoNote').textContent = 'фото додано';
-};
-$('apSend').onclick = async () => {
-  const type = document.querySelector('#apTypes .chip.on').textContent;
-  const text = $('apText').value.trim();
-  if (!text && !apPhoto) { toast('Напишіть кілька слів'); return; }
-  $('apSend').disabled = true;
-  try {
-    const j = await api('appeal', { type, text, photo: apPhoto });
-    if (!j.ok) { toast(j.msg || 'Не вдалося надіслати'); return; }
-    $('apSheet').classList.add('hidden'); $('apText').value = ''; apPhoto = null;
-    $('apPhotoPrev').classList.add('hidden'); $('apPhotoNote').textContent = 'наприклад, довідка'; $('apPhoto').value = '';
-    toast('Надіслано у відділ кадрів');
-    const aps = await api('appeals'); if (aps.ok) { store.set(LS.ap, aps.items); renderAppeals(aps.items); }
-  } catch (e) { if (e.message !== 'auth') toast('Немає зв’язку. Спробуйте пізніше.'); }
-  finally { $('apSend').disabled = false; }
-};
-
-function shrink(file, max, q) {
-  return new Promise((res, rej) => {
-    const img = new Image();
-    img.onload = () => {
-      const k = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(img.src); res(c.toDataURL('image/jpeg', q));
-    };
-    img.onerror = rej; img.src = URL.createObjectURL(file);
-  });
-}
-
-// ---------- меню ----------
-$('menuBtn').onclick = () => $('menuSheet').classList.remove('hidden');
-$('mClose').onclick = () => $('menuSheet').classList.add('hidden');
-$('mRefresh').onclick = () => { $('menuSheet').classList.add('hidden'); refresh().then(() => toast('Оновлено')); };
-$('mLogout').onclick = () => { if (confirm('Вийти з акаунта на цьому телефоні?')) logout(false); };
-document.querySelectorAll('.sheet').forEach(s => s.addEventListener('click', e => { if (e.target === s) s.classList.add('hidden'); }));
-
-// ===================== СПОВІЩЕННЯ =====================
-const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-
-function pushMsg(html, withBtn) {
-  $('pushBox').innerHTML = (withBtn ? '<button class="btn ghost" id="pushBtn">🔔 Увімкнути сповіщення</button>' : '') +
-    (html ? '<div class="card note" style="text-align:left;margin-top:10px">' + html + '</div>' : '');
-  if (withBtn) $('pushBtn').onclick = () => setupPush(true);
-}
-function withTimeout(p, ms, what) {
-  return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what + ': немає відповіді')), ms))]);
-}
-const HOW_ALLOW = 'Натисніть значок 🔒 зліва від адреси → <b>Дозволи</b> (або «Налаштування сайту») → <b>Сповіщення</b> → <b>Дозволити</b>, потім оновіть сторінку.';
-
-async function setupPush(ask) {
-  if (!('serviceWorker' in navigator)) { pushMsg('Цей браузер не підтримує сповіщення. Відкрийте SNEWS у Chrome.', false); return; }
-  if (isIOS && !standalone) {
-    pushMsg('🔔 Щоб отримувати сповіщення на iPhone: відкрийте цю сторінку в <b>Safari</b> → кнопка <b>Поділитися</b> → <b>«На початковий екран»</b>, і запускайте SNEWS зі значка.', false);
-    return;
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = ok ? 880 : 220; o.connect(g); g.connect(audio.destination);
+      g.gain.setValueAtTime(0.25, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + (ok ? 0.25 : 0.6));
+      o.start(); o.stop(audio.currentTime + (ok ? 0.25 : 0.6));
+    } catch (e) {}
   }
-  if (!('Notification' in window) || !('PushManager' in window)) { pushMsg('Цей браузер не підтримує сповіщення. Відкрийте SNEWS у Chrome.', false); return; }
-  if (Notification.permission === 'denied') { pushMsg('🔕 Сповіщення заборонені для цього сайту. ' + HOW_ALLOW, false); return; }
-  if (Notification.permission !== 'granted' && !ask) { pushMsg('', true); return; }
-  try {
-    if (Notification.permission !== 'granted') {
-      pushMsg('Зачекайте… Браузер має запитати дозвіл на сповіщення.', false);
-      const p = await Notification.requestPermission();
-      if (p !== 'granted') {
-        pushMsg('Дозвіл не отримано. Можливо, Chrome сховав запит (значок 🔔 у рядку адреси). ' + HOW_ALLOW, true);
-        return;
+
+  // ---------- екран результату ----------
+  let ovTimer;
+  function show(color, big, name, sub, ms) {
+    const ov = $('overlay');
+    ov.style.background = color; $('ovBig').textContent = big; $('ovName').textContent = name || ''; $('ovSub').textContent = sub || '';
+    ov.classList.add('show'); clearTimeout(ovTimer);
+    ovTimer = setTimeout(() => ov.classList.remove('show'), ms || 3500);
+  }
+
+  // ---------- черга офлайн ----------
+  const getQ = () => JSON.parse(localStorage.getItem(LS.queue) || '[]');
+  const setQ = q => { localStorage.setItem(LS.queue, JSON.stringify(q)); renderStatus(); };
+  let online = true;
+  function renderStatus(text) {
+    const q = getQ().length;
+    $('status').innerHTML = (text || (online ? '● Зв’язок є' : '● Немає зв’язку — відмітки зберігаються на планшеті')) +
+      (q ? ` · <span class="q">у черзі: ${q}</span>` : '');
+  }
+
+  async function post(payload) {
+    const r = await fetch(cfg.api, { method: 'POST', body: JSON.stringify(payload) }); // text/plain — без CORS-preflight
+    return r.json();
+  }
+
+  let flushing = false;
+  async function flushQueue() {
+    if (flushing) return; flushing = true;
+    try {
+      let q = getQ();
+      while (q.length) {
+        try { await post(q[0]); online = true; } catch (e) { online = false; break; }
+        q.shift(); setQ(q);
       }
-    }
-    if (ask) pushMsg('Підключаю сповіщення…', false);
-    if (typeof firebase === 'undefined') throw new Error('не завантажився Firebase — перевірте інтернет');
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    const reg = swReg || await withTimeout(navigator.serviceWorker.register('firebase-messaging-sw.js'), 15000, 'service worker');
-    const fcm = await withTimeout(firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg }), 20000, 'Firebase');
-    if (!fcm) throw new Error('Firebase не видав токен');
-    const j = await api('push', { fcm });
-    if (!j.ok) throw new Error(j.msg || 'сервер не зберіг пристрій');
-    store.set(LS.fcm, fcm);
-    if (ask) pushMsg('✅ Сповіщення увімкнено', false); else $('pushBox').innerHTML = '';
-    setTimeout(() => { if ($('pushBox').textContent.includes('увімкнено')) $('pushBox').innerHTML = ''; }, 4000);
-    firebase.messaging().onMessage(m => {
-      const n = m.notification || {};
-      toast((n.title ? n.title + ': ' : '') + (n.body || ''));
-      refresh();
-    });
-  } catch (e) {
-    console.warn(e);
-    pushMsg('Не вдалося увімкнути: ' + esc(e.message || e) + '. Спробуйте ще раз.', true);
+    } finally { flushing = false; renderStatus(); }
   }
-}
+  setInterval(flushQueue, RETRY_MS);
 
-// ===================== СТАРТ =====================
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('firebase-messaging-sw.js').then(r => swReg = r).catch(e => console.warn(e));
-}
-window.addEventListener('online', refresh);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && token) refresh(); });
-window.addEventListener('hashchange', () => { if (token) openTab(location.hash.slice(1)); });
+  // ---------- камера і сканування ----------
+  const video = $('video'), scan = $('scan'), shot = $('shot');
+  const sctx = scan.getContext('2d', { willReadFrequently: true });
+  let lastCode = '', lastAt = 0, busy = false, started = false;
 
-if (token && me) showMain(); else $('login').classList.remove('hidden');
+  async function start() {
+    if (!cfg.api || !cfg.key) { openSettings(); return; }
+    $('point').textContent = cfg.point || 'Точка відмітки';
+    if (started) return; started = true;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false });
+      video.srcObject = stream; await video.play();
+      renderStatus();
+      try { await navigator.wakeLock.request('screen'); } catch (e) {}
+      flushQueue();
+      loop();
+    } catch (e) {
+      $('status').textContent = 'Камера недоступна: ' + e.message + '. Дозвольте доступ до камери в браузері.';
+      started = false;
+    }
+  }
+
+  function loop() {
+    setTimeout(loop, 200);
+    if (busy || video.readyState < 2) return;
+    const w = 640, h = Math.round(video.videoHeight / video.videoWidth * w) || 480;
+    scan.width = w; scan.height = h;
+    sctx.drawImage(video, 0, 0, w, h);
+    const img = sctx.getImageData(0, 0, w, h);
+    const qr = jsQR(img.data, w, h, { inversionAttempts: 'dontInvert' });
+    if (!qr || !qr.data) return;
+    const code = qr.data.trim().toUpperCase();
+    const now = Date.now();
+    if (code === lastCode && now - lastAt < COOLDOWN_MS) return;
+    lastCode = code; lastAt = now;
+    handle(code);
+  }
+
+  function photo() {
+    const w = 480, h = Math.round(video.videoHeight / video.videoWidth * w) || 360;
+    shot.width = w; shot.height = h;
+    const c = shot.getContext('2d');
+    c.translate(w, 0); c.scale(-1, 1);       // як у дзеркалі, як бачить людина
+    c.drawImage(video, 0, 0, w, h);
+    return shot.toDataURL('image/jpeg', 0.6);
+  }
+
+  async function handle(code) {
+    if (!/^SG-[0-9A-F]{10}$/.test(code)) { beep(false); show('#7f1d1d', 'Невідомий код', '', 'Покажіть QR-код SERGIO'); return; }
+    busy = true;
+    const payload = { action: 'mark', key: cfg.key, code: code, point: cfg.point || '', photo: photo(), clientTime: new Date().toISOString() };
+    try {
+      const res = await post(payload);
+      online = true;
+      if (!res.ok) { beep(false); show('#7f1d1d', '✖', res.msg || 'Помилка', ''); }
+      else if (res.duplicate) { beep(true); show('#374151', 'Вже відмічено', res.name, res.type + ' о ' + res.time, 2500); }
+      else if (res.type === 'Прихід') { beep(true); show('#166534', 'ПРИХІД ' + res.time, res.name, 'Гарного робочого дня!'); }
+      else { beep(true); show('#1e3a8a', 'УХІД ' + res.time, res.name, 'Дякуємо, до побачення!'); }
+    } catch (e) {
+      online = false;
+      payload.offline = true;
+      const q = getQ(); q.push(payload); setQ(q);
+      beep(true);
+      const t = new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+      show('#92400e', 'ЗБЕРЕЖЕНО ' + t, code, 'Немає інтернету — відмітку буде надіслано автоматично');
+    } finally {
+      setTimeout(() => busy = false, 1500);
+      renderStatus();
+    }
+  }
+
+  start();
+})();
 </script>
 </body>
 </html>
