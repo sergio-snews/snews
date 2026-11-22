@@ -87,6 +87,8 @@
   .row.b { font-weight:700; }
   .row.sub { font-weight:700; border-top:1px solid var(--line); }
   .row.i { font-size:14px; color:var(--muted); padding:4px 0 4px 14px; border-bottom:0; }
+  .ackbox { margin-top:12px; font-size:13px; color:var(--muted); text-align:center; }
+  .ackbtn { margin-top:12px; width:100%; }
   .row.total { font-size:18px; font-weight:800; border-top:2px solid var(--g); border-bottom:0; margin-top:6px; padding-top:10px; }
   .grp { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-top:10px; }
 
@@ -393,6 +395,10 @@ const PAY_ROWS = [
   ['Розрахунок за місяць', null],
   ['earlier', 'Нараховано раніше за місяць'], ['advance', 'Аванс', '', 'minus'], ['goods', 'Товар', '', 'minus'], ['paid', 'Вже виплачено', '', 'minus'],
 ];
+function payFoot(p) {
+  if (p.ack) return `<div class="ackbox">✔ Ознайомлено ${esc(p.ack)}. Лист буде доступний до ${esc(p.until)}.<br>Потрібен знову — напишіть звернення.</div>`;
+  return `<button class="btn ackbtn" data-ack="${esc(p.period)}">Ознайомився</button>`;
+}
 function renderPay(items) {
   const list = $('payList');
   if (!items) { list.innerHTML = '<div class="empty">Завантаження…</div>'; return; }
@@ -409,7 +415,7 @@ function renderPay(items) {
         const t = l.s === 'total' ? 'Залишок' : l.t;
         return `<div class="row ${cls}"><span>${esc(t)}</span><span>${esc(val)}</span></div>`;
       }).join('');
-      return `<div class="card pay"><h3>${esc(p.period)}</h3>${body}</div>`;
+      return `<div class="card pay"><h3>${esc(p.period)}</h3>${body}${payFoot(p)}</div>`;
     }
     let html = '', grp = null;
     PAY_ROWS.forEach(r => {
@@ -422,8 +428,17 @@ function renderPay(items) {
     });
     if (d.total !== undefined) html += `<div class="row total"><span>До виплати</span><span>${num(d.total)} ₴</span></div>`;
     if (d.note) html += `<div class="muted" style="margin-top:8px;font-size:14px">${esc(d.note)}</div>`;
-    return `<div class="card pay"><h3>${esc(p.period)}</h3>${html}</div>`;
+    return `<div class="card pay"><h3>${esc(p.period)}</h3>${html}${payFoot(p)}</div>`;
   }).join('');
+  list.querySelectorAll('[data-ack]').forEach(b => b.onclick = async () => {
+    if (!confirm('Підтвердити, що ви ознайомилися з розрахунком? Через ' + 3 + ' дні він зникне з застосунку.')) return;
+    b.disabled = true;
+    try {
+      const j = await api('payack', { period: b.dataset.ack });
+      if (j.ok) { store.set(LS.pay, j.items); renderPay(j.items); toast('Дякуємо!'); }
+      else { b.disabled = false; toast(j.msg || 'Помилка'); }
+    } catch (e) { b.disabled = false; if (e.message !== 'auth') toast('Немає зв’язку'); }
+  });
 }
 
 // ---------- повідомлення ----------
