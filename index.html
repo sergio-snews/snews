@@ -396,13 +396,19 @@ const PAY_ROWS = [
   ['earlier', 'Нараховано раніше за місяць'], ['advance', 'Аванс', '', 'minus'], ['goods', 'Товар', '', 'minus'], ['paid', 'Вже виплачено', '', 'minus'],
 ];
 function payFoot(p) {
-  if (p.ack) return `<div class="ackbox">✔ Ознайомлено ${esc(p.ack)}. Лист буде доступний до ${esc(p.until)}.<br>Потрібен знову — напишіть звернення.</div>`;
+  if (p.ack) return `<div class="ackbox">✔ Ознайомлено ${esc(p.ack)}</div>`;
   return `<button class="btn ackbtn" data-ack="${esc(p.period)}">Ознайомився</button>`;
 }
 function renderPay(items) {
   const list = $('payList');
   if (!items) { list.innerHTML = '<div class="empty">Завантаження…</div>'; return; }
-  if (!items.length) { list.innerHTML = '<div class="empty">Тут з’являтимуться ваші розрахунки<br>після того, як їх опублікує керівник.</div>'; return; }
+  const askHR = `<div class="ackbox" style="margin:16px 0">Щоб отримати розрахунковий лист, напишіть у відділ кадрів.<button class="btn ghost ackbtn" id="payAsk">Написати у відділ кадрів</button></div>`;
+  const bindAsk = () => { const b = $('payAsk'); if (b) b.onclick = () => {
+    document.querySelectorAll('#apTypes .chip').forEach(x => x.classList.toggle('on', x.textContent === 'Інше'));
+    $('apText').value = 'Прошу надіслати розрахунковий лист за ';
+    $('apSheet').classList.remove('hidden'); $('apText').focus();
+  }; };
+  if (!items.length) { list.innerHTML = '<div class="empty">Розрахунків зараз немає.</div>' + askHR; bindAsk(); return; }
   list.innerHTML = items.map(p => {
     const d = p.data || {};
     if (Array.isArray(d.lines)) {
@@ -429,9 +435,9 @@ function renderPay(items) {
     if (d.total !== undefined) html += `<div class="row total"><span>До виплати</span><span>${num(d.total)} ₴</span></div>`;
     if (d.note) html += `<div class="muted" style="margin-top:8px;font-size:14px">${esc(d.note)}</div>`;
     return `<div class="card pay"><h3>${esc(p.period)}</h3>${html}${payFoot(p)}</div>`;
-  }).join('');
+  }).join('') + askHR;
+  bindAsk();
   list.querySelectorAll('[data-ack]').forEach(b => b.onclick = async () => {
-    if (!confirm('Підтвердити, що ви ознайомилися з розрахунком? Через ' + 3 + ' дні він зникне з застосунку.')) return;
     b.disabled = true;
     try {
       const j = await api('payack', { period: b.dataset.ack });
