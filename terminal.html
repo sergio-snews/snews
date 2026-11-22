@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<title>SERGIO · Відмітка часу</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+  :root { --bg:#0f1720; --card:#17212c; --text:#eef3f7; --muted:#8aa0b2; --ok:#22c55e; --out:#3b82f6; --err:#ef4444; --warn:#f59e0b; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow:hidden; }
+  .wrap { display:flex; height:100%; gap:24px; padding:24px; }
+  .left { flex:1; display:flex; flex-direction:column; justify-content:space-between; }
+  .right { flex:1.1; display:flex; align-items:center; justify-content:center; }
+  .brand { font-size:20px; letter-spacing:.2em; color:var(--muted); }
+  .point { font-size:22px; margin-top:6px; }
+  .clock { font-size:min(16vw,140px); font-weight:700; line-height:1; font-variant-numeric:tabular-nums; }
+  .date { font-size:24px; color:var(--muted); margin-top:8px; }
+  .hint { font-size:26px; line-height:1.35; }
+  .hint b { color:var(--ok); }
+  .status { font-size:15px; color:var(--muted); }
+  .status .q { color:var(--warn); font-weight:600; }
+  .cam { position:relative; width:100%; max-width:620px; aspect-ratio:4/3; border-radius:24px; overflow:hidden; background:#000; border:3px solid #24313f; }
+  video { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+  .frame { position:absolute; inset:18%; border:4px dashed rgba(255,255,255,.55); border-radius:18px; }
+  .overlay { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px; }
+  .overlay.show { display:flex; }
+  .overlay .big { font-size:min(12vw,110px); font-weight:800; }
+  .overlay .name { font-size:min(6vw,52px); margin-top:18px; font-weight:600; }
+  .overlay .sub { font-size:28px; margin-top:14px; opacity:.9; }
+  .settings { position:fixed; inset:0; background:var(--bg); display:none; align-items:center; justify-content:center; }
+  .settings.show { display:flex; }
+  .box { background:var(--card); padding:32px; border-radius:20px; width:min(560px,92vw); }
+  .box h2 { margin-bottom:18px; }
+  .box label { display:block; margin:14px 0 6px; color:var(--muted); }
+  .box input { width:100%; padding:14px; font-size:18px; border-radius:10px; border:1px solid #2b3a4a; background:#0e151d; color:var(--text); }
+  .box button { margin-top:22px; width:100%; padding:16px; font-size:20px; border:0; border-radius:12px; background:var(--ok); color:#06240f; font-weight:700; }
+  .box .small { font-size:13px; color:var(--muted); margin-top:12px; }
+  .gear { position:fixed; right:14px; bottom:12px; width:46px; height:46px; border-radius:50%; border:1px solid #2b3a4a; background:#17212c; color:var(--muted); font-size:24px; line-height:44px; text-align:center; opacity:.55; cursor:pointer; z-index:5; }
+  .gear:active { opacity:1; }
+  @media (orientation:portrait) { .wrap { flex-direction:column; } .right { flex:none; } .clock { font-size:22vw; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="left">
+    <div>
+      <div class="brand">SERGIO</div>
+      <div class="point" id="point">—</div>
+    </div>
+    <div>
+      <div class="clock" id="clock">--:--</div>
+      <div class="date" id="date"></div>
+    </div>
+    <div class="hint">Піднесіть <b>QR-код</b> на телефоні до камери</div>
+    <div class="status" id="status">Запуск камери…</div>
+  </div>
+  <div class="right">
+    <div class="cam"><video id="video" playsinline muted></video><div class="frame"></div></div>
+  </div>
+</div>
+
+<button class="gear" id="gear" title="Налаштування">⚙</button>
+
+<div class="overlay" id="overlay">
+  <div class="big" id="ovBig"></div>
+  <div class="name" id="ovName"></div>
+  <div class="sub" id="ovSub"></div>
+</div>
+
+<div class="settings" id="settings">
+  <div class="box">
+    <h2>Налаштування термінала</h2>
+    <label>Адреса Google Apps Script (закінчується на /exec)</label>
+    <input id="sApi" type="url" inputmode="url" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
+    <label>Ключ термінала (TERMINAL_KEY)</label>
+    <input id="sKey" inputmode="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label>Назва точки</label>
+    <input id="sPoint" autocomplete="off" placeholder="Приміщення 1">
+    <button id="sSave">Зберегти і запустити</button>
+    <div class="small">Повернутися сюди пізніше — кнопка ⚙ у правому нижньому куті (потрібен ключ термінала).</div>
+  </div>
+</div>
+
+<canvas id="scan" hidden></canvas>
+<canvas id="shot" hidden></canvas>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const LS = { cfg: 'sergio_terminal_cfg', queue: 'sergio_terminal_queue' };
+  const COOLDOWN_MS = 8000;      // той самий код не обробляємо повторно 8 сек
+  const RETRY_MS = 30000;        // повтор відправки черги
+
+  // ---------- конфіг ----------
+  let cfg = JSON.parse(localStorage.getItem(LS.cfg) || '{}');
+  const url = new URLSearchParams(location.search);
+  if (url.get('api'))   cfg.api = url.get('api');
+  if (url.get('key'))   cfg.key = url.get('key').replace(/[^0-9a-zA-Z]/g, '').toLowerCase();
+  if (url.get('point')) cfg.point = url.get('point');
+  if (url.get('api') || url.get('key') || url.get('point')) {
+    localStorage.setItem(LS.cfg, JSON.stringify(cfg));
+    history.replaceState(null, '', location.pathname);   // ключ не висить в адресі
+  }
+
+  function openSettings() {
+    $('sApi').value = cfg.api || ''; $('sKey').value = cfg.key || ''; $('sPoint').value = cfg.point || '';
+    $('settings').classList.add('show');
+  }
+  $('sSave').onclick = () => {
+    cfg = { api: $('sApi').value.replace(/\s/g, ''), key: $('sKey').value.replace(/[^0-9a-zA-Z]/g, '').toLowerCase(), point: $('sPoint').value.trim() };
+    localStorage.setItem(LS.cfg, JSON.stringify(cfg));
+    $('settings').classList.remove('show');
+    start();
+  };
+  // Кнопка ⚙ — налаштування захищені ключем термінала, щоб працівники випадково не змінили
+  $('gear').onclick = () => {
+    if (!cfg.key) { openSettings(); return; }
+    const k = prompt('Введіть ключ термінала, щоб відкрити налаштування:');
+    if (k === null) return;
+    if (k.replace(/[^0-9a-zA-Z]/g, '').toLowerCase() === String(cfg.key).toLowerCase()) openSettings();
+    else alert('Невірний ключ');
+  };
+
+  // ---------- годинник ----------
+  const days = ['неділя','понеділок','вівторок','середа','четвер',"п'ятниця",'субота'];
+  function tick() {
+    const d = new Date();
+    $('clock').textContent = d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+    $('date').textContent = d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' }) + ', ' + days[d.getDay()];
+  }
+  tick(); setInterval(tick, 1000);
+
+  // ---------- звук ----------
+  let audio;
+  function beep(ok) {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = ok ? 880 : 220; o.connect(g); g.connect(audio.destination);
+      g.gain.setValueAtTime(0.25, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + (ok ? 0.25 : 0.6));
+      o.start(); o.stop(audio.currentTime + (ok ? 0.25 : 0.6));
+    } catch (e) {}
+  }
+
+  // ---------- екран результату ----------
+  let ovTimer;
+  function show(color, big, name, sub, ms) {
+    const ov = $('overlay');
+    ov.style.background = color; $('ovBig').textContent = big; $('ovName').textContent = name || ''; $('ovSub').textContent = sub || '';
+    ov.classList.add('show'); clearTimeout(ovTimer);
+    ovTimer = setTimeout(() => ov.classList.remove('show'), ms || 3500);
+  }
+
+  // ---------- черга офлайн ----------
+  const getQ = () => JSON.parse(localStorage.getItem(LS.queue) || '[]');
+  const setQ = q => { localStorage.setItem(LS.queue, JSON.stringify(q)); renderStatus(); };
+  let online = true;
+  function renderStatus(text) {
+    const q = getQ().length;
+    $('status').innerHTML = (text || (online ? '● Зв’язок є' : '● Немає зв’язку — відмітки зберігаються на планшеті')) +
+      (q ? ` · <span class="q">у черзі: ${q}</span>` : '');
+  }
+
+  async function post(payload) {
+    const r = await fetch(cfg.api, { method: 'POST', body: JSON.stringify(payload) }); // text/plain — без CORS-preflight
+    return r.json();
+  }
+
+  let flushing = false;
+  async function flushQueue() {
+    if (flushing) return; flushing = true;
+    try {
+      let q = getQ();
+      while (q.length) {
+        try { await post(q[0]); online = true; } catch (e) { online = false; break; }
+        q.shift(); setQ(q);
+      }
+    } finally { flushing = false; renderStatus(); }
+  }
+  setInterval(flushQueue, RETRY_MS);
+
+  // ---------- камера і сканування ----------
+  const video = $('video'), scan = $('scan'), shot = $('shot');
+  const sctx = scan.getContext('2d', { willReadFrequently: true });
+  let lastCode = '', lastAt = 0, busy = false, started = false;
+
+  async function start() {
+    if (!cfg.api || !cfg.key) { openSettings(); return; }
+    $('point').textContent = cfg.point || 'Точка відмітки';
+    if (started) return; started = true;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false });
+      video.srcObject = stream; await video.play();
+      renderStatus();
+      try { await navigator.wakeLock.request('screen'); } catch (e) {}
+      flushQueue();
+      loop();
+    } catch (e) {
+      $('status').textContent = 'Камера недоступна: ' + e.message + '. Дозвольте доступ до камери в браузері.';
+      started = false;
+    }
+  }
+
+  function loop() {
+    setTimeout(loop, 200);
+    if (busy || video.readyState < 2) return;
+    const w = 640, h = Math.round(video.videoHeight / video.videoWidth * w) || 480;
+    scan.width = w; scan.height = h;
+    sctx.drawImage(video, 0, 0, w, h);
+    const img = sctx.getImageData(0, 0, w, h);
+    const qr = jsQR(img.data, w, h, { inversionAttempts: 'dontInvert' });
+    if (!qr || !qr.data) return;
+    const code = qr.data.trim().toUpperCase();
+    const now = Date.now();
+    if (code === lastCode && now - lastAt < COOLDOWN_MS) return;
+    lastCode = code; lastAt = now;
+    handle(code);
+  }
+
+  function photo() {
+    const w = 480, h = Math.round(video.videoHeight / video.videoWidth * w) || 360;
+    shot.width = w; shot.height = h;
+    const c = shot.getContext('2d');
+    c.translate(w, 0); c.scale(-1, 1);       // як у дзеркалі, як бачить людина
+    c.drawImage(video, 0, 0, w, h);
+    return shot.toDataURL('image/jpeg', 0.6);
+  }
+
+  async function handle(code) {
+    if (!/^SG-[0-9A-F]{10}$/.test(code)) { beep(false); show('#7f1d1d', 'Невідомий код', '', 'Покажіть QR-код SERGIO'); return; }
+    busy = true;
+    const payload = { action: 'mark', key: cfg.key, code: code, point: cfg.point || '', photo: photo(), clientTime: new Date().toISOString() };
+    try {
+      const res = await post(payload);
+      online = true;
+      if (!res.ok) { beep(false); show('#7f1d1d', '✖', res.msg || 'Помилка', ''); }
+      else if (res.duplicate) { beep(true); show('#374151', 'Вже відмічено', res.name, res.type + ' о ' + res.time, 2500); }
+      else if (res.type === 'Прихід') { beep(true); show('#166534', 'ПРИХІД ' + res.time, res.name, 'Гарного робочого дня!'); }
+      else { beep(true); show('#1e3a8a', 'УХІД ' + res.time, res.name, 'Дякуємо, до побачення!'); }
+    } catch (e) {
+      online = false;
+      payload.offline = true;
+      const q = getQ(); q.push(payload); setQ(q);
+      beep(true);
+      const t = new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+      show('#92400e', 'ЗБЕРЕЖЕНО ' + t, code, 'Немає інтернету — відмітку буде надіслано автоматично');
+    } finally {
+      setTimeout(() => busy = false, 1500);
+      renderStatus();
+    }
+  }
+
+  start();
+})();
+</script>
+</body>
+</html>
