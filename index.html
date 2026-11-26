@@ -287,6 +287,7 @@
   <div class="in">
     <h2 id="mName"></h2>
     <div class="muted" id="mInfo" style="line-height:1.6"></div>
+    <button class="btn ghost hidden" id="mTg">✈️ Підключити Telegram</button>
     <button class="btn ghost" id="mRefresh">Оновити дані</button>
     <button class="btn ghost" id="mLogout" style="color:var(--red)">Вийти з акаунта</button>
     <button class="btn" id="mClose" style="margin-top:10px">Закрити</button>
@@ -386,7 +387,7 @@ async function refresh() {
       api('me'), api('mymarks', { days: 31 }), api('messages'), api('appeals'), api('payslips')
     ]);
     $('offline').classList.add('hidden');
-    if (m.ok) { me = Object.assign(me, m); store.set(LS.me, me); renderHeader(); if (me.code !== $('qCode').textContent) renderQR(); }
+    if (m.ok) { me = Object.assign(me, m); store.set(LS.me, me); renderHeader(); renderTg(); if (me.code !== $('qCode').textContent) renderQR(); }
     if (marks.ok) { store.set(LS.marks, marks.days); renderMarks(marks.days); }
     if (msgs.ok)  { store.set(LS.msg, msgs.items); renderMsgs(msgs.items); }
     if (aps.ok)   { store.set(LS.ap, aps.items); renderAppeals(aps.items); }
@@ -702,8 +703,41 @@ $('rcDone').onclick = () => sendReact('Виконано');
 $('rcRej').onclick  = () => sendReact('Відхилено');
 
 // ---------- меню ----------
-$('menuBtn').onclick = () => $('menuSheet').classList.remove('hidden');
+$('menuBtn').onclick = () => { renderTg(); $('menuSheet').classList.remove('hidden'); };
 $('mClose').onclick = () => $('menuSheet').classList.add('hidden');
+// ---------- Telegram ----------
+function renderTg() {
+  const b = $('mTg');
+  if (!me || !me.tgBot) { b.classList.add('hidden'); return; }
+  b.classList.remove('hidden');
+  b.textContent = me.tg ? '✈️ Telegram підключено — відключити' : '✈️ Підключити Telegram';
+}
+let tgWaiting = false;
+$('mTg').onclick = async () => {
+  try {
+    if (me.tg) {
+      if (!confirm('Відключити Telegram? Сповіщення в застосунку залишаться.')) return;
+      const j = await api('tgunlink');
+      if (j.ok) { me.tg = false; store.set(LS.me, me); renderTg(); toast('Telegram відключено'); }
+      return;
+    }
+    const j = await api('tglink');
+    if (!j.ok) { toast(j.msg || 'Не вдалося'); return; }
+    tgWaiting = true;
+    $('menuSheet').classList.add('hidden');
+    toast('У Telegram натисніть «Start» / «Почати»');
+    location.href = j.url;
+  } catch (e) { if (e.message !== 'auth') toast('Немає зв’язку. Спробуйте пізніше.'); }
+};
+// Повернулися з Telegram — перевіряємо, чи підключилось
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible' || !tgWaiting) return;
+  try {
+    const j = await api('tgcheck');
+    if (j.ok && j.tg) { tgWaiting = false; me.tg = true; store.set(LS.me, me); renderTg(); toast('Telegram підключено ✅'); }
+  } catch (e) {}
+});
+
 $('mRefresh').onclick = () => { $('menuSheet').classList.add('hidden'); refresh().then(() => toast('Оновлено')); };
 $('mLogout').onclick = () => { if (confirm('Вийти з акаунта на цьому телефоні?')) logout(false); };
 document.querySelectorAll('.sheet').forEach(s => s.addEventListener('click', e => { if (e.target === s) s.classList.add('hidden'); }));
