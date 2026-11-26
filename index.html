@@ -123,6 +123,12 @@
   .badge { position:absolute; top:4px; left:calc(50% + 8px); min-width:18px; height:18px; padding:0 5px; border-radius:9px;
            background:var(--red); color:#fff; font-size:11px; line-height:18px; }
 
+  .wk .st { font-size:13px; font-weight:700; }
+  .wk .st.new { color:var(--amber); } .wk .st.work { color:#2f6fb5; } .wk .st.done { color:var(--gd); } .wk .st.rej { color:var(--red); }
+  .wk .who { font-size:13px; color:var(--muted); margin-bottom:6px; }
+  .wk .acts { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .wk .acts button { flex:1; min-width:30%; padding:10px 6px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-weight:600; font-size:14px; }
+  .wk img.ph { max-width:100%; border-radius:12px; margin-top:8px; }
   .sheet { position:fixed; inset:0; z-index:10; background:rgba(0,0,0,.35); display:flex; align-items:flex-end; }
   .sheet .in { background:#fff; width:100%; border-radius:22px 22px 0 0; padding:22px 18px calc(22px + var(--safe-b)); max-height:92%; overflow:auto; }
   .toast { position:fixed; left:50%; bottom:calc(92px + var(--safe-b)); transform:translateX(-50%); background:var(--ink); color:#fff;
@@ -195,11 +201,25 @@
     </div>
   </section>
 
+  <!-- Робота: несправності, пропозиції, чого не вистачає -->
+  <section id="tab-work" class="hidden">
+    <div class="seg hidden" id="wkSeg">
+      <button id="segMy" class="on">Мої повідомлення</button>
+      <button id="segIn">Вхідні <span class="badge hidden" id="inBadge" style="position:static;display:inline-block;margin-left:6px;vertical-align:1px"></span></button>
+    </div>
+    <div id="myPane">
+      <button class="btn" id="newWk" style="margin:0 0 14px">🛠 Повідомити / запропонувати</button>
+      <div id="wkList"></div>
+    </div>
+    <div id="inPane" class="hidden"><div id="inList"></div></div>
+  </section>
+
   <nav>
     <button data-tab="qr" class="on"><i>▦</i>QR</button>
     <button data-tab="marks"><i>🕘</i>Відмітки</button>
     <button data-tab="pay"><i>₴</i>ЗП</button>
     <button data-tab="msg"><i>💬</i>Повідомлення<span class="badge hidden" id="navBadge"></span></button>
+    <button data-tab="work"><i>🛠</i>Робота<span class="badge hidden" id="wkBadge"></span></button>
   </nav>
 </div>
 
@@ -222,6 +242,43 @@
     </div>
     <button class="btn" id="apSend">Надіслати</button>
     <button class="btn ghost" id="apCancel" style="margin-top:10px">Скасувати</button>
+  </div>
+</div>
+
+<!-- Нове повідомлення по роботі -->
+<div class="sheet hidden" id="wkSheet">
+  <div class="in">
+    <h2>Повідомити / запропонувати</h2>
+    <div class="chips" id="wkTypes">
+      <button class="chip on">Несправність</button>
+      <button class="chip">Пропозиція по роботі</button>
+      <button class="chip">Чого не вистачає</button>
+    </div>
+    <textarea id="wkText" maxlength="2000" placeholder="Що сталося і де? Або що пропонуєте?"></textarea>
+    <div class="photo">
+      <button class="btn ghost" id="wkPhotoBtn" style="margin:0;width:auto;padding:10px 14px">📎 Фото</button>
+      <img id="wkPhotoPrev" class="hidden" alt="">
+      <span class="muted" id="wkPhotoNote" style="font-size:13px">наприклад, що зламалося</span>
+      <input type="file" id="wkPhoto" accept="image/*" class="hidden">
+    </div>
+    <button class="btn" id="wkSend">Надіслати</button>
+    <button class="btn ghost" id="wkCancel" style="margin-top:10px">Скасувати</button>
+  </div>
+</div>
+
+<!-- Реакція відповідального -->
+<div class="sheet hidden" id="rcSheet">
+  <div class="in">
+    <h2 id="rcTitle"></h2>
+    <div class="muted" id="rcInfo" style="margin-bottom:10px"></div>
+    <div id="rcText" style="white-space:pre-wrap;margin-bottom:12px"></div>
+    <textarea id="rcReply" maxlength="2000" placeholder="Відповідь працівнику (що зроблено або чому ні)"></textarea>
+    <div class="wk"><div class="acts">
+      <button id="rcWork">🔧 В роботі</button>
+      <button id="rcDone">✅ Виконано</button>
+      <button id="rcRej">✖ Відхилити</button>
+    </div></div>
+    <button class="btn ghost" id="rcCancel" style="margin-top:14px">Закрити</button>
   </div>
 </div>
 
@@ -251,7 +308,7 @@ const VAPID_KEY = "BFRUsT6uT_kVoQhqg1yS8avXg9MlTSs3FDXyEm4EyT-cZ3FvAJYw3CprpzzFA
 // =========================================================
 
 const $ = id => document.getElementById(id);
-const LS = { tok:'snews_token', me:'snews_me', marks:'snews_marks', msg:'snews_msg', ap:'snews_ap', pay:'snews_pay', fcm:'snews_fcm' };
+const LS = { tok:'snews_token', me:'snews_me', marks:'snews_marks', msg:'snews_msg', ap:'snews_ap', pay:'snews_pay', fcm:'snews_fcm', inbox:'snews_inbox' };
 const store = { get:k => { try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; } },
                 set:(k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} } };
 let token = store.get(LS.tok);
@@ -302,6 +359,7 @@ function showMain() {
   $('login').classList.add('hidden'); $('main').classList.remove('hidden');
   renderHeader(); renderQR();
   renderMarks(store.get(LS.marks)); renderMsgs(store.get(LS.msg)); renderAppeals(store.get(LS.ap)); renderPay(store.get(LS.pay));
+  renderInbox(store.get(LS.inbox));
   openTab((location.hash || '#qr').slice(1));
   refresh();
   setupPush(false);
@@ -333,6 +391,7 @@ async function refresh() {
     if (msgs.ok)  { store.set(LS.msg, msgs.items); renderMsgs(msgs.items); }
     if (aps.ok)   { store.set(LS.ap, aps.items); renderAppeals(aps.items); }
     if (pay.ok)   { store.set(LS.pay, pay.items); renderPay(pay.items); }
+    await loadInbox();
   } catch (e) {
     if (e.message !== 'auth') $('offline').classList.remove('hidden');
   }
@@ -342,8 +401,9 @@ async function refresh() {
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => openTab(b.dataset.tab));
 function openTab(t) {
   if (t === 'appeal') { t = 'msg'; seg('ap'); }
-  if (!['qr','marks','pay','msg'].includes(t)) t = 'qr';
-  ['qr','marks','pay','msg'].forEach(x => $('tab-' + x).classList.toggle('hidden', x !== t));
+  if (t === 'inbox') { t = 'work'; wkSegTo('in'); }
+  if (!['qr','marks','pay','msg','work'].includes(t)) t = 'qr';
+  ['qr','marks','pay','msg','work'].forEach(x => $('tab-' + x).classList.toggle('hidden', x !== t));
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   history.replaceState(null, '', '#' + t);
   window.scrollTo(0, 0);
@@ -468,7 +528,9 @@ function renderMsgs(items) {
   });
 }
 
-function renderAppeals(items) {
+function renderAppeals(all) {
+  renderWork(all ? all.filter(a => a.category === 'Робота') : all);
+  const items = all ? all.filter(a => a.category !== 'Робота') : all;
   const list = $('apList');
   if (!items) { list.innerHTML = ''; return; }
   if (!items.length) { list.innerHTML = '<div class="empty">Ви ще не надсилали звернень</div>'; return; }
@@ -530,6 +592,114 @@ function shrink(file, max, q) {
     img.onerror = rej; img.src = URL.createObjectURL(file);
   });
 }
+
+// ---------- робота: мої повідомлення ----------
+function stCls(s) { return s === 'Нове' ? 'new' : s === 'В роботі' ? 'work' : s === 'Виконано' ? 'done' : s === 'Відхилено' ? 'rej' : ''; }
+function renderWork(items) {
+  const list = $('wkList');
+  if (!items) { list.innerHTML = ''; return; }
+  if (!items.length) { list.innerHTML = '<div class="empty">Помітили несправність, маєте ідею або чогось бракує для роботи?<br>Напишіть — відповідальний побачить одразу.</div>'; return; }
+  list.innerHTML = items.map(a => `<div class="card wk">
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:6px">
+        <span><b style="color:var(--ink)">${esc(a.type)}</b> · ${esc(a.time)}</span>
+        <span class="st ${stCls(a.status)}">${esc(a.status === 'Нове' ? 'Надіслано' : a.status)}</span></div>
+      <div style="white-space:pre-wrap">${esc(a.text)}${a.hasPhoto ? ' 📎' : ''}</div>
+      ${a.reply ? `<div class="reply" style="margin-top:10px;padding:10px 12px;background:var(--gl);border-radius:12px;white-space:pre-wrap"><b>${esc(a.who || 'Відповідь')}:</b> ${esc(a.reply)}</div>` : ''}</div>`).join('');
+}
+
+let wkPhoto = null;
+$('newWk').onclick = () => $('wkSheet').classList.remove('hidden');
+$('wkCancel').onclick = () => $('wkSheet').classList.add('hidden');
+document.querySelectorAll('#wkTypes .chip').forEach(c => c.onclick = () => {
+  document.querySelectorAll('#wkTypes .chip').forEach(x => x.classList.remove('on')); c.classList.add('on');
+});
+$('wkPhotoBtn').onclick = () => $('wkPhoto').click();
+$('wkPhoto').onchange = async () => {
+  const f = $('wkPhoto').files[0]; if (!f) return;
+  wkPhoto = await shrink(f, 1280, 0.75);
+  $('wkPhotoPrev').src = wkPhoto; $('wkPhotoPrev').classList.remove('hidden'); $('wkPhotoNote').textContent = 'фото додано';
+};
+$('wkSend').onclick = async () => {
+  const type = document.querySelector('#wkTypes .chip.on').textContent;
+  const text = $('wkText').value.trim();
+  if (!text && !wkPhoto) { toast('Напишіть кілька слів'); return; }
+  $('wkSend').disabled = true;
+  try {
+    const j = await api('work', { type, text, photo: wkPhoto });
+    if (!j.ok) { toast(j.msg || 'Не вдалося надіслати'); return; }
+    $('wkSheet').classList.add('hidden'); $('wkText').value = ''; wkPhoto = null;
+    $('wkPhotoPrev').classList.add('hidden'); $('wkPhotoNote').textContent = 'наприклад, що зламалося'; $('wkPhoto').value = '';
+    toast('Надіслано. Дякуємо!');
+    const aps = await api('appeals'); if (aps.ok) { store.set(LS.ap, aps.items); renderAppeals(aps.items); }
+  } catch (e) { if (e.message !== 'auth') toast('Немає зв’язку. Спробуйте пізніше.'); }
+  finally { $('wkSend').disabled = false; }
+};
+
+// ---------- робота: вхідні відповідального ----------
+function wkSegTo(which) {
+  $('segMy').classList.toggle('on', which === 'my'); $('segIn').classList.toggle('on', which === 'in');
+  $('myPane').classList.toggle('hidden', which !== 'my'); $('inPane').classList.toggle('hidden', which !== 'in');
+}
+$('segMy').onclick = () => wkSegTo('my');
+$('segIn').onclick = () => wkSegTo('in');
+
+async function loadInbox() {
+  if (!me || !me.responsible) { store.set(LS.inbox, null); renderInbox(null); return; }
+  const j = await api('inbox');
+  if (j.ok) { store.set(LS.inbox, j.items); renderInbox(j.items); }
+}
+
+let inboxItems = [];
+function renderInbox(items) {
+  const resp = !!(me && me.responsible);
+  $('wkSeg').classList.toggle('hidden', !resp);
+  if (!resp) { wkSegTo('my'); ['inBadge', 'wkBadge'].forEach(id => $(id).classList.add('hidden')); return; }
+  inboxItems = items || [];
+  const fresh = inboxItems.filter(a => a.status === 'Нове').length;
+  ['inBadge', 'wkBadge'].forEach(id => { $(id).textContent = fresh; $(id).classList.toggle('hidden', !fresh); });
+  const list = $('inList');
+  if (!items) { list.innerHTML = '<div class="empty">Завантаження…</div>'; return; }
+  if (!items.length) { list.innerHTML = '<div class="empty">Нових повідомлень немає 👍</div>'; return; }
+  list.innerHTML = items.map(a => `<div class="card wk" data-id="${a.id}">
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:4px">
+        <span><b style="color:var(--ink)">${esc(a.type)}</b> · ${esc(a.time)}</span>
+        <span class="st ${stCls(a.status)}">${esc(a.status)}</span></div>
+      <div class="who">${esc(a.name)}${a.dept ? ' · ' + esc(a.dept) : ''}</div>
+      <div style="white-space:pre-wrap">${esc(a.text)}</div>
+      ${a.photo ? `<div style="margin-top:8px"><a href="${esc(a.photo)}" target="_blank" rel="noopener" style="color:var(--gd);font-weight:600">📎 Відкрити фото</a></div>` : ''}
+      ${a.reply ? `<div class="reply" style="margin-top:10px;padding:10px 12px;background:var(--gl);border-radius:12px;white-space:pre-wrap"><b>${esc(a.who || 'Відповідь')}:</b> ${esc(a.reply)}</div>` : ''}
+      ${a.status === 'Виконано' || a.status === 'Відхилено' ? '' : '<div class="acts"><button class="rcOpen">Відреагувати</button></div>'}
+    </div>`).join('');
+  list.querySelectorAll('.rcOpen').forEach(b => b.onclick = () => openReact(Number(b.closest('.wk').dataset.id)));
+}
+
+let rcId = null;
+function openReact(id) {
+  const a = inboxItems.find(x => x.id === id); if (!a) return;
+  rcId = id;
+  $('rcTitle').textContent = a.type;
+  $('rcInfo').textContent = a.name + (a.dept ? ' · ' + a.dept : '') + ' · ' + a.time;
+  $('rcText').textContent = a.text;
+  $('rcReply').value = a.reply || '';
+  $('rcSheet').classList.remove('hidden');
+}
+$('rcCancel').onclick = () => $('rcSheet').classList.add('hidden');
+async function sendReact(status) {
+  const text = $('rcReply').value.trim();
+  if (status === 'Відхилено' && !text) { toast('Напишіть, чому відхилено'); return; }
+  ['rcWork', 'rcDone', 'rcRej'].forEach(id => $(id).disabled = true);
+  try {
+    const j = await api('react', { id: rcId, status, text });
+    if (!j.ok) { toast(j.msg || 'Не вдалося зберегти'); return; }
+    store.set(LS.inbox, j.items); renderInbox(j.items);
+    $('rcSheet').classList.add('hidden');
+    toast('Збережено — працівник побачить відповідь');
+  } catch (e) { if (e.message !== 'auth') toast('Немає зв’язку. Спробуйте пізніше.'); }
+  finally { ['rcWork', 'rcDone', 'rcRej'].forEach(id => $(id).disabled = false); }
+}
+$('rcWork').onclick = () => sendReact('В роботі');
+$('rcDone').onclick = () => sendReact('Виконано');
+$('rcRej').onclick  = () => sendReact('Відхилено');
 
 // ---------- меню ----------
 $('menuBtn').onclick = () => $('menuSheet').classList.remove('hidden');
